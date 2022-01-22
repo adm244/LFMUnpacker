@@ -25,7 +25,9 @@ namespace LFMUnpacker
           int dataOffset = reader.ReadInt32BE();
           byte globalFlags = reader.ReadByte();
 
-          byte[] tableBuffer = reader.ReadBytes(dataOffset - (int)reader.BaseStream.Position);
+          // NOTE(adm244): game handles dataOffset as table buffer size so we have extra 5 bytes of garbage at the end
+          // buffer's size is used to decrypt it's content; it's either a bug or made on purpose to confuse reversers
+          byte[] tableBuffer = reader.ReadBytes(dataOffset);
           if ((globalFlags & 4) != 0)
           {
             int key = dataOffset + 0x00E6C2CF;
@@ -34,7 +36,7 @@ namespace LFMUnpacker
 
           TableEntry[] entries = ReadTable(tableBuffer, (globalFlags & 2) != 0);
 
-          Trace.Assert(reader.BaseStream.Position == dataOffset);
+          reader.BaseStream.Seek(dataOffset, SeekOrigin.Begin);
 
           for (int i = 0; i < entries.Length; ++i)
           {
@@ -45,7 +47,7 @@ namespace LFMUnpacker
               Directory.CreateDirectory(folder);
             
             byte[] buffer = reader.ReadBytes(entries[i].Size);
-            if (entries[i].Flags == 1)
+            if ((entries[i].Flags & 1) != 0)
             {
               int key = (dataOffset + entries[i].Offset) + (entries[i].Size * 7);
               XorData(key, buffer);
